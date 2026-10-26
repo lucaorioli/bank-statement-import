@@ -16,6 +16,7 @@ Online Bank Statements: Stripe
    !! source digest: sha256:8291679fc2d98dda7d811ae0309a236f843c169aadbabd8fc63a09bfe83c45cb
    !! source digest: sha256:c1180e695a6758a9379e50180ae7c191c7b2905f60675330208086d7231a5e47
    !! source digest: sha256:3b0cc6e1daeb56c97c77549148764a1261bbf7c59f00ea157f94827142801304
+   !! source digest: sha256:864f1c7db03a1f35e8db6ac8605df107e99d0d87fd855887653f187d120aac7a
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -42,6 +43,11 @@ Requests that fail for a temporary reason (rate limit, conflict, server
 or network error) are retried a few times, waiting longer at each
 attempt, as recommended by Stripe. Other errors are reported with the
 message sent by Stripe and the id of the request.
+The lines of the payments also get the details of the payer and of the
+payment: email, phone and address of the billing details, the customer,
+the payment method, the masked card number and its expiry date, the
+subscription (when the billing data are fetched) and a link to the
+payment or the payout on the Stripe dashboard.
 
 **Table of contents**
 

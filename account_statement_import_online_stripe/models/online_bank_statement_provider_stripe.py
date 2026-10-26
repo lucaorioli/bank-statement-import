@@ -1,6 +1,7 @@
 # Copyright 2026 Luca Orioli <lucaorioli@gmail.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import calendar
 import json
 import logging
 import re
@@ -8,6 +9,8 @@ import time
 import urllib.request
 from datetime import datetime
 from urllib.error import HTTPError, URLError
+from datetime import date, datetime
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 
 import pytz
@@ -166,6 +169,7 @@ class OnlineBankStatementProviderStripe(models.Model):
                     "unique_import_id": tx["id"],
                     "raw_data": json.dumps(tx),
                     **self._stripe_foreign_currency_values(tx),
+                    **self._stripe_line_details(tx),
                 }
         transactions = list(self._stripe_api_get_all("/balance_transactions", params))
         odoo_payments = {}
@@ -452,6 +456,46 @@ class OnlineBankStatementProviderStripe(models.Model):
             self.message_post(body=message)
 
     @api.model
+    def _stripe_line_details(self, tx):
+        """Details of the counterpart and of the payment of a transaction"""
+        source = tx.get("source")
+        if not isinstance(source, dict):
+            return {}
+        details = {}
+        if source.get("object") == "charge":
+            billing = source.get("billing_details") or {}
+            address = billing.get("address") or {}
+            method = source.get("payment_method_details") or {}
+            card = method.get("card") or {}
+            country = self._stripe_country(address.get("country"))
+            details = {
+                "partner_email": billing.get("email"),
+                "partner_phone": billing.get("phone"),
+                "partner_street": ", ".join(
+                    filter(None, [address.get("line1"), address.get("line2")])
+                ),
+                "partner_zip": address.get("postal_code"),
+                "partner_city": address.get("city"),
+                "partner_state_name": address.get("state"),
+                "partner_country_id": country.id,
+                "partner_external_ref": _stripe_id(source.get("customer")),
+                "payment_method_type": method.get("type"),
+                "card_masked_number": card.get("last4") and f"**** {card['last4']}",
+                "card_expiry_date": _card_expiry_date(card),
+            }
+        subscription = tx.get("subscription")
+        if isinstance(subscription, dict):
+            details["subscription_ref"] = subscription.get("id")
+        details["provider_url"] = _stripe_dashboard_url(source)
+        return {key: value for key, value in details.items() if value}
+
+    @api.model
+    def _stripe_country(self, code):
+        if not code:
+            return self.env["res.country"]
+        return self.env["res.country"].search([("code", "=", code.upper())], limit=1)
+
+    @api.model
     def _stripe_api_get_all(self, path, params=None):
         if params is None:
             params = []
@@ -567,6 +611,38 @@ def _stripe_payment_keys(tx):
         return set()
     keys = {source.get("id"), source.get("payment_intent")}
     return {key for key in keys if isinstance(key, str)}
+
+
+def _stripe_id(value):
+    """Id of a Stripe object, expanded or not"""
+    if isinstance(value, dict):
+        return value.get("id")
+    return value
+
+
+def _card_expiry_date(card):
+    """Last day of the month in which the card expires"""
+    try:
+        year, month = int(card["exp_year"]), int(card["exp_month"])
+        return date(year, month, calendar.monthrange(year, month)[1])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _stripe_dashboard_url(source):
+    """Link to the payment or the payout on the Stripe dashboard"""
+    if source.get("object") == "charge":
+        object_id = _stripe_id(source.get("payment_intent")) or source.get("id")
+        path = "payments"
+    elif source.get("object") == "payout":
+        object_id = source.get("id")
+        path = "payouts"
+    else:
+        return None
+    if not object_id:
+        return None
+    mode = "" if source.get("livemode", True) else "test/"
+    return f"https://dashboard.stripe.com/{mode}{path}/{object_id}"
 
 
 def safe_format(template, kwargs):
