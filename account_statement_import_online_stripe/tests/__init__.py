@@ -6,3 +6,4 @@ from . import test_stripe_billing
 from . import test_stripe_fees
 from . import test_stripe_odoo_payments
 from . import test_stripe_balances
+from . import test_stripe_currencies

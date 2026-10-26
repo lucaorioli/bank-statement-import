@@ -14,6 +14,8 @@ import pytz
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
+from odoo.tools import html2plaintext
 
 _logger = logging.getLogger(__name__)
 
@@ -102,6 +104,10 @@ class OnlineBankStatementProviderStripe(models.Model):
         help="Set the starting and ending balances of the statements from the "
         "balance of the Stripe account, so that Odoo shows the statements whose "
         "lines do not match it. It needs more requests to Stripe.",
+    stripe_foreign_currency = fields.Boolean(
+        string="Payments in Foreign Currencies",
+        help="For the payments made in a currency other than the one of the "
+        "balance, keep on the line the amount and the currency of the payment.",
     )
 
     @api.model
@@ -148,7 +154,10 @@ class OnlineBankStatementProviderStripe(models.Model):
         if self.stripe_skip_website_payments:
             odoo_payments = self._stripe_get_odoo_payments(transactions)
         for tx in transactions:
+        other_currencies = set()
+        for tx in self._stripe_api_get_all("/balance_transactions", params):
             if tx["currency"].lower() != currency.name.lower():
+                other_currencies.add(tx["currency"].upper())
                 continue
             if self.stripe_fetch_billing:
                 self._stripe_add_billing_objects(tx, cache)
@@ -160,6 +169,17 @@ class OnlineBankStatementProviderStripe(models.Model):
                     if key in odoo_payments
                 ),
                 None,
+            lines.append(
+                {
+                    "ref": safe_format(self.stripe_reference, tx),
+                    "payment_ref": safe_format(self.stripe_label, tx),
+                    "narration": safe_format(self.stripe_note, tx),
+                    "amount": float(tx["amount"]) / (10**currency.decimal_places),
+                    "date": datetime.fromtimestamp(tx["created"]),
+                    "unique_import_id": tx["id"],
+                    "raw_data": json.dumps(tx),
+                    **self._stripe_foreign_currency_values(tx),
+                }
             )
             if odoo_payment:
                 payment_values = self._stripe_odoo_payment_line_values(odoo_payment)
@@ -369,6 +389,65 @@ class OnlineBankStatementProviderStripe(models.Model):
         ):
             return None
         return {"partner_id": payment_transaction.partner_id.id}
+        if other_currencies:
+            self._stripe_warn_other_currencies(other_currencies)
+        return lines, {}
+
+    def _stripe_foreign_currency_values(self, tx):
+        """Amount and currency of a payment made in another currency"""
+        self.ensure_one()
+        source = tx.get("source")
+        if not self.stripe_foreign_currency or not isinstance(source, dict):
+            return {}
+        source_currency = (source.get("currency") or "").upper()
+        if not source_currency or source_currency == tx["currency"].upper():
+            return {}
+        foreign_currency = (
+            self.env["res.currency"]
+            .with_context(active_test=False)
+            .search([("name", "=", source_currency)], limit=1)
+        )
+        # A charge may be captured only in part
+        amount = source.get("amount_captured") or source.get("amount")
+        if not foreign_currency or not amount or not tx.get("amount"):
+            return {}
+        sign = -1 if tx["amount"] < 0 else 1
+        return {
+            "foreign_currency_id": foreign_currency.id,
+            "amount_currency": sign
+            * abs(amount)
+            / (10**foreign_currency.decimal_places),
+        }
+
+    def _stripe_warn_other_currencies(self, currencies):
+        """Warn about the transactions of the balances in other currencies.
+
+        They belong to another balance of the Stripe account, which needs a
+        provider on a journal in that currency: no warning when it exists.
+        """
+        self.ensure_one()
+        handled = self.search(
+            [
+                ("service", "=", "stripe"),
+                ("password", "=", self.password),
+                ("id", "!=", self.id),
+            ]
+        ).mapped(lambda provider: provider.currency_id.name)
+        missing = sorted(currencies - set(handled))
+        if not missing:
+            return
+        message = self.env._(
+            "Transactions in %(currencies)s were not imported, because they "
+            "belong to the balance of the Stripe account in that currency. To "
+            "import them, add a provider with the same key on a journal in that "
+            "currency.",
+            currencies=", ".join(missing),
+        )
+        _logger.warning("Stripe provider %s: %s", self.name, message)
+        # Once, not at each pull
+        last_message = self.message_ids[:1]
+        if not last_message or html2plaintext(last_message.body) != message:
+            self.message_post(body=message)
 
     @api.model
     def _stripe_api_get_all(self, path, params=None):
