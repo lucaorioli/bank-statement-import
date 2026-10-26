@@ -381,9 +381,6 @@ class OnlineBankStatementProviderStripe(models.Model):
         ):
             return None
         return {"partner_id": payment_transaction.partner_id.id}
-        if other_currencies:
-            self._stripe_warn_other_currencies(other_currencies)
-        return lines, {}
 
     def _stripe_foreign_currency_values(self, tx):
         """Amount and currency of a payment made in another currency"""
