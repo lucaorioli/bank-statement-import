@@ -5,3 +5,4 @@
   - [Tecnativa](https://www.tecnativa.com):
       - Carolina Fernandez
   - Michael Tietz (MT Software) \<<mtietz@mt-software.de>\>
+  - Luca Orioli \<<lucaorioli@gmail.com>\>
