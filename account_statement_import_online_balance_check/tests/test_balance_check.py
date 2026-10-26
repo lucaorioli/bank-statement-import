@@ -6,12 +6,6 @@ from unittest.mock import patch
 
 from odoo.addons.base.tests.common import BaseCommon
 
-OBTAIN = (
-    "odoo.addons.account_statement_import_online.models"
-    ".online_bank_statement_provider.OnlineBankStatementProvider"
-    "._obtain_statement_data"
-)
-
 TRANSACTIONS = [
     ("tx-a", datetime(2023, 3, 15, 9), 100.0),
     ("tx-b", datetime(2023, 3, 15, 15), 50.0),
@@ -49,10 +43,19 @@ class TestBalanceCheck(BaseCommon):
         cls.provider = cls.env["online.bank.statement.provider"].create(
             {"service": "dummy", "journal_id": cls.journal.id, "tz": "UTC"}
         )
-        with patch(OBTAIN, _obtain_statement_data):
+        with cls._patch_provider():
             cls.provider._pull(datetime(2023, 3, 15), datetime(2023, 3, 17))
         cls.lines = cls.env["account.bank.statement.line"].search(
             [("journal_id", "=", cls.journal.id)], order="date, id"
+        )
+
+    @classmethod
+    def _patch_provider(cls):
+        # On the class of the registry, so that it wins over the other modules
+        return patch.object(
+            type(cls.env["online.bank.statement.provider"]),
+            "_obtain_statement_data",
+            _obtain_statement_data,
         )
 
     def _check(self):
@@ -63,7 +66,7 @@ class TestBalanceCheck(BaseCommon):
                 "date_to": date(2023, 3, 16),
             }
         )
-        with patch(OBTAIN, _obtain_statement_data):
+        with self._patch_provider():
             check.action_check()
         return check
 
@@ -102,7 +105,7 @@ class TestBalanceCheck(BaseCommon):
         self.assertEqual(check.day_ids.mapped("cumulative_difference"), [-50.0, -50.0])
         self.assertEqual(check.missing_count, 1)
 
-        with patch(OBTAIN, _obtain_statement_data):
+        with self._patch_provider():
             check.action_import_missing()
         self.assertEqual(check.missing_count, 0)
         self.assertTrue(
