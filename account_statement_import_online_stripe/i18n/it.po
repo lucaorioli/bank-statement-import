@@ -27,14 +27,119 @@ msgid "API base"
 msgstr "API base"
 
 #. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fetch_billing
+msgid ""
+"Also fetch the customer, the invoice and the subscription of each payment, "
+"so that they can be used in the labels, for instance {customer.email}, "
+"{invoice.number} or {subscription.id}, and they are kept in the raw data of "
+"the line. It needs more requests to Stripe, and the source of the "
+"transactions must be expanded (data.source)."
+msgstr ""
+"Legge anche il cliente, la fattura e l'abbonamento di ogni pagamento, così "
+"si possono usare nelle etichette, per esempio {customer.email}, "
+"{invoice.number} o {subscription.id}, e restano nei dati grezzi della riga. "
+"Richiede più chiamate a Stripe, e l'origine delle transazioni deve essere "
+"espansa (data.source)."
+
+#. module: account_statement_import_online_stripe
 #: model_terms:ir.ui.view,arch_db:account_statement_import_online_stripe.online_bank_statement_provider_form
 msgid "Expand"
 msgstr "Espandi"
 
 #. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fee_partner_id
+msgid "Fees Partner"
+msgstr "Partner delle commissioni"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fee_as_payment
+msgid "Fees as Payments to Stripe"
+msgstr "Commissioni come pagamenti a Stripe"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fetch_billing
+msgid "Fetch Billing Data"
+msgstr "Leggi i dati di fatturazione"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_foreign_currency
+msgid ""
+"For the payments made in a currency other than the one of the balance, keep "
+"on the line the amount and the currency of the payment."
+msgstr ""
+"Per i pagamenti fatti in una valuta diversa da quella del saldo, conserva "
+"sulla riga l'importo e la valuta del pagamento."
+
+#. module: account_statement_import_online_stripe
 #: model:ir.model,name:account_statement_import_online_stripe.model_online_bank_statement_provider
 msgid "Online Bank Statement Provider"
 msgstr "Fornitore estratto conto bancario online"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fee_partner_id
+msgid ""
+"Partner set on the fee lines when they are recorded as payments to Stripe."
+msgstr ""
+"Partner impostato sulle righe delle commissioni quando sono registrate come "
+"pagamenti a Stripe."
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_skip_website_payments
+msgid "Payments Already Recorded by Odoo"
+msgstr "Pagamenti già registrati da Odoo"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_foreign_currency
+msgid "Payments in Foreign Currencies"
+msgstr "Pagamenti in valuta estera"
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_skip_website_payments
+msgid ""
+"Payments made through the Stripe payment provider of Odoo (for instance on "
+"the website) are already recorded by Odoo. When their payment is posted on "
+"the account of this journal, the line of the payment is not imported again "
+"(its fee is); otherwise the line gets the partner of the payment, ready to "
+"be reconciled. It needs the Payment module."
+msgstr ""
+"I pagamenti fatti con il fornitore di pagamento Stripe di Odoo (per esempio "
+"sul sito) sono già registrati da Odoo. Se il loro pagamento è registrato sul"
+" conto di questo registro, la riga del pagamento non viene importata di "
+"nuovo (la sua commissione sì); altrimenti la riga riceve il partner del "
+"pagamento, pronta da riconciliare. Richiede il modulo Pagamenti."
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_fee_as_payment
+msgid ""
+"Set the partner below on the fee lines, so that a reconciliation model can "
+"reconcile them with the payable account of the partner, as payments of the "
+"invoices Stripe sends for its fees."
+msgstr ""
+"Imposta il partner qui sotto sulle righe delle commissioni, così un modello "
+"di riconciliazione può riconciliarle con il conto fornitori del partner, "
+"come pagamenti delle fatture che Stripe invia per le sue commissioni."
+
+#. module: account_statement_import_online_stripe
+#. odoo-python
+#: code:addons/account_statement_import_online_stripe/models/online_bank_statement_provider_stripe.py:0
+msgid "Set the partner of the fees to record them as payments."
+msgstr "Imposta il partner delle commissioni per registrarle come pagamenti."
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,help:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_statement_balances
+msgid ""
+"Set the starting and ending balances of the statements from the balance of "
+"the Stripe account, so that Odoo shows the statements whose lines do not "
+"match it. It needs more requests to Stripe."
+msgstr ""
+"Imposta i saldi iniziale e finale degli estratti conto dal saldo del conto "
+"Stripe, così Odoo mostra gli estratti conto le cui righe non corrispondono. "
+"Richiede più chiamate a Stripe."
+
+#. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_statement_balances
+msgid "Statement Balances"
+msgstr "Saldi degli estratti conto"
 
 #. module: account_statement_import_online_stripe
 #: model_terms:ir.ui.view,arch_db:account_statement_import_online_stripe.online_bank_statement_provider_form
@@ -67,6 +172,12 @@ msgid "Statement Reference"
 msgstr "Riferimento estratto conto"
 
 #. module: account_statement_import_online_stripe
+#. odoo-python
+#: code:addons/account_statement_import_online_stripe/models/online_bank_statement_provider_stripe.py:0
+msgid "Stripe API call failed: %(path)s: %(message)s"
+msgstr "Chiamata all'API di Stripe non riuscita: %(path)s: %(message)s"
+
+#. module: account_statement_import_online_stripe
 #: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_expand
 msgid "Stripe Expand"
 msgstr "Espandi transizione"
@@ -97,6 +208,11 @@ msgid "Stripe Note"
 msgstr "Nota transizione"
 
 #. module: account_statement_import_online_stripe
+#: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_payment_installed
+msgid "Stripe Payment Installed"
+msgstr "Pagamenti Stripe installati"
+
+#. module: account_statement_import_online_stripe
 #: model:ir.model.fields,field_description:account_statement_import_online_stripe.field_online_bank_statement_provider__stripe_reference
 msgid "Stripe Reference"
 msgstr "Riferimento transizione"
@@ -105,3 +221,15 @@ msgstr "Riferimento transizione"
 #: model_terms:ir.ui.view,arch_db:account_statement_import_online_stripe.online_bank_statement_provider_form
 msgid "Stripe configuration"
 msgstr "Configurazione transizione"
+
+#. module: account_statement_import_online_stripe
+#. odoo-python
+#: code:addons/account_statement_import_online_stripe/models/online_bank_statement_provider_stripe.py:0
+msgid ""
+"Transactions in %(currencies)s were not imported, because they belong to the"
+" balance of the Stripe account in that currency. To import them, add a "
+"provider with the same key on a journal in that currency."
+msgstr ""
+"Le transazioni in %(currencies)s non sono state importate, perché "
+"appartengono al saldo del conto Stripe in quella valuta. Per importarle, "
+"aggiungi un fornitore con la stessa chiave su un registro in quella valuta."

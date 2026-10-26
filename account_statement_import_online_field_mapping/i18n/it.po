@@ -1,0 +1,115 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* account_statement_import_online_field_mapping
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model,name:account_statement_import_online_field_mapping.model_account_bank_statement_line
+msgid "Bank Statement Line"
+msgstr "Riga estratto conto"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__company_id
+msgid "Company"
+msgstr "Azienda"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,help:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__company_id
+msgid "Company related to this journal"
+msgstr "Azienda collegata a questo registro"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__create_uid
+msgid "Created by"
+msgstr "Creato da"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__create_date
+msgid "Created on"
+msgstr "Creato il"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__display_name
+msgid "Display Name"
+msgstr "Nome visualizzato"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__expression
+msgid "Expression"
+msgstr "Espressione"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__field_id
+msgid "Field"
+msgstr "Campo"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider__mapping_ids
+#: model_terms:ir.ui.view,arch_db:account_statement_import_online_field_mapping.online_bank_statement_provider_form
+msgid "Field Mapping"
+msgstr "Mappatura campi"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__write_uid
+msgid "Last Updated by"
+msgstr "Ultimo aggiornamento di"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__write_date
+msgid "Last Updated on"
+msgstr "Ultimo aggiornamento il"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model,name:account_statement_import_online_field_mapping.model_online_bank_statement_provider
+msgid "Online Bank Statement Provider"
+msgstr "Fornitore estratto conto bancario online"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model,name:account_statement_import_online_field_mapping.model_online_bank_statement_provider_mapping
+msgid "Online Bank Statement Provider Field Mapping"
+msgstr "Mappatura campi del fornitore estratto conto bancario online"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__provider_id
+msgid "Provider"
+msgstr "Fornitore"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.actions.server,name:account_statement_import_online_field_mapping.account_bank_statement_line_action_reapply_field_mapping
+msgid "Reapply Field Mapping"
+msgstr "Riapplica mappatura campi"
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,field_description:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__sequence
+msgid "Sequence"
+msgstr "Sequenza"
+
+#. module: account_statement_import_online_field_mapping
+#. odoo-python
+#: code:addons/account_statement_import_online_field_mapping/models/online_bank_statement_provider_mapping.py:0
+msgid "The field %(field)s cannot be filled by a mapping."
+msgstr "Il campo %(field)s non può essere riempito da una mappatura."
+
+#. module: account_statement_import_online_field_mapping
+#: model:ir.model.fields,help:account_statement_import_online_field_mapping.field_online_bank_statement_provider_mapping__expression
+msgid ""
+"Value to write, from the raw data of the transaction: the path of a value in"
+" braces, like {payer.email}, possibly within some text, like Invoice "
+"{invoice.number}. Alternatives separated by | are tried in order until one "
+"gives a value, like {source.payment_intent} | {source.id}."
+msgstr ""
+"Valore da scrivere, preso dai dati grezzi della transazione: il percorso di "
+"un valore tra graffe, come {payer.email}, eventualmente dentro un testo, "
+"come Fattura {invoice.number}. Le alternative separate da | si provano in "
+"ordine finché una dà un valore, come {source.payment_intent} | {source.id}."
