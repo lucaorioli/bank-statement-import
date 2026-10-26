@@ -370,7 +370,6 @@ class OnlineBankStatementProviderPayPal(models.Model):
             # The whole transaction (payer, cart...) as valid JSON, so that
             # it can be read back later
             "raw_data": json.dumps(data, default=str),
-            "raw_data": transaction,
             **self._paypal_line_details(data),
         }
         payer_full_name = payer_name.get("full_name") or payer_name.get(
