@@ -4,3 +4,4 @@
       - Ronald Portier \<<ronald@therp.nl>\>
   - [Tecnativa](https://www.tecnativa.com):
       - Carolina Fernandez
+  - Luca Orioli \<<lucaorioli@gmail.com>\>
