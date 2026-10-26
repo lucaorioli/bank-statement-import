@@ -12,6 +12,7 @@ Online Bank Statements
    !! changes will be overwritten.                   !!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !! source digest: sha256:8b1c7638c64a637347c470e140b0ba302c8a8f00cb3dc02b6b27e0f1903d8bda
+   !! source digest: sha256:6f23a48c045237807f37e9079da5e4a7d173760827246ac2934f0823c43a0128
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -53,6 +54,12 @@ at the provider configuration level.
 
 **NOTE**: To access these features, user needs to belong to *Show Full
 Accounting Features* group.
+
+When a database is neutralized (for instance a copy used for testing),
+all the providers are deactivated, so that the copy does not pull
+statements with the credentials of the original database. To use a
+provider in the copy, set test credentials if needed and activate it
+again.
 
 Usage
 =====
@@ -101,6 +108,7 @@ Contributors
   - Carolina Fernandez
 
 - Michael Tietz (MT Software) <mtietz@mt-software.de>
+- Luca Orioli <lucaorioli@gmail.com>
 
 Maintainers
 -----------
