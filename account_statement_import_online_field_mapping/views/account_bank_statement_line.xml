@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Copyright 2026 Luca Orioli <lucaorioli@gmail.com>
+    License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
+-->
+<odoo>
+    <record
+        id="account_bank_statement_line_action_reapply_field_mapping"
+        model="ir.actions.server"
+    >
+        <field name="name">Reapply Field Mapping</field>
+        <field name="model_id" ref="account.model_account_bank_statement_line" />
+        <field
+            name="binding_model_id"
+            ref="account.model_account_bank_statement_line"
+        />
+        <field name="group_ids" eval="[(4, ref('account.group_account_user'))]" />
+        <field name="state">code</field>
+        <field name="code">records.action_reapply_field_mapping()</field>
+    </record>
+</odoo>
