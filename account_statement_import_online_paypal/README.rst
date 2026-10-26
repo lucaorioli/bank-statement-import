@@ -12,6 +12,7 @@ Online Bank Statements: PayPal.com
    !! changes will be overwritten.                   !!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !! source digest: sha256:c527649d7a283bceaae5f9e1c3a0cfac1c1859cba4584db1b6a554cd036bffc8
+   !! source digest: sha256:4f9cfd2bd4454e7f449ffe521d26906bc93cadc29aa395195646446401def370
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -34,6 +35,11 @@ Online Bank Statements: PayPal.com
 
 This module provides online bank statements from
 `PayPal.com <https://paypal.com/>`__.
+
+The lines of the transactions also get the details of the payer and of
+the payment: email, phone, address and country of the payer, its PayPal
+account id, the payment instrument and the subscription, when the
+transaction belongs to one.
 
 **Table of contents**
 
