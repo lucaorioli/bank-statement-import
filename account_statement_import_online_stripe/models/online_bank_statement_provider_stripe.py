@@ -334,6 +334,7 @@ class OnlineBankStatementProviderStripe(models.Model):
                     raise
                 cache[path] = None
         return cache[path]
+
     def _stripe_get_odoo_payments(self, transactions):
         """Payments recorded by the Stripe payment provider of Odoo.
 
@@ -382,9 +383,6 @@ class OnlineBankStatementProviderStripe(models.Model):
         ):
             return None
         return {"partner_id": payment_transaction.partner_id.id}
-        if other_currencies:
-            self._stripe_warn_other_currencies(other_currencies)
-        return lines, {}
 
     def _stripe_foreign_currency_values(self, tx):
         """Amount and currency of a payment made in another currency"""
