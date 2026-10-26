@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 import pytz
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -54,6 +54,32 @@ class OnlineBankStatementProviderStripe(models.Model):
         "kept in the raw data of the line. It needs more requests to Stripe, and "
         "the source of the transactions must be expanded (data.source).",
     )
+    stripe_fee_as_payment = fields.Boolean(
+        string="Fees as Payments to Stripe",
+        help="Set the partner below on the fee lines, so that a reconciliation "
+        "model can reconcile them with the payable account of the partner, as "
+        "payments of the invoices Stripe sends for its fees.",
+    )
+    stripe_fee_partner_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Fees Partner",
+        help="Partner set on the fee lines when they are recorded as payments "
+        "to Stripe.",
+    )
+
+    @api.constrains("service", "stripe_fee_as_payment", "stripe_fee_partner_id")
+    def _check_stripe_fee_partner(self):
+        for provider in self:
+            if (
+                provider.service == "stripe"
+                and provider.stripe_fee_as_payment
+                and not provider.stripe_fee_partner_id
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "Set the partner of the fees to record them as payments."
+                    )
+                )
 
     @api.model
     def _get_available_services(self):
@@ -84,6 +110,7 @@ class OnlineBankStatementProviderStripe(models.Model):
             if not s:
                 continue
             params.append(("expand[]", s))
+        fee_values = self._stripe_fee_line_values()
         lines = []
         cache = {}
         for tx in self._stripe_api_get_all("/balance_transactions", params):
@@ -112,9 +139,22 @@ class OnlineBankStatementProviderStripe(models.Model):
                         "date": datetime.fromtimestamp(tx["created"]),
                         "unique_import_id": tx["id"] + "_fee",
                         "raw_data": json.dumps(tx),
+                        **fee_values,
                     }
                 )
         return lines, {}
+
+    def _stripe_fee_line_values(self):
+        """Values of the fee lines when they are recorded as payments to Stripe"""
+        self.ensure_one()
+        if not self.stripe_fee_as_payment:
+            return {}
+        partner = self.stripe_fee_partner_id
+        return {
+            "partner_id": partner.id,
+            "partner_name": partner.name,
+            "transaction_type": "fee",
+        }
 
     @api.model
     def _stripe_add_billing_objects(self, tx, cache):
