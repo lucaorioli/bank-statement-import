@@ -13,6 +13,7 @@ Online Bank Statements: Stripe
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !! source digest: sha256:5c21eecab7c8e0158ccf17aeee6ed4da9bf33b1bef81bf20ccabe1424d1d85b6
    !! source digest: sha256:d17acfea545a968819ca883e65ac3d9863136bc7bad3e376b042628ed30e7282
+   !! source digest: sha256:75f4d296bc4533aa3b2e0feff8b28c7756c73d81e5bc6f6e76af1c7afec780c0
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -76,6 +77,16 @@ Models*) for the Stripe journal, matching the lines of that partner with
 a negative amount, with the payable account of the partner as
 counterpart. The invoices of Stripe can then be reconciled with these
 payments.
+If Odoo itself takes payments through Stripe (the Stripe payment
+provider, for instance on the website), those payments are already
+recorded by Odoo. To avoid importing them twice, check *Payments Already
+Recorded by Odoo* (visible when the Payment module is installed). For
+each transaction paid through Odoo:
+
+- if its payment is posted on the account of this journal, the line of
+  the payment is not imported (its fee is);
+- otherwise the line is imported with the partner of the payment, ready
+  to be reconciled with it.
 
 Bug Tracker
 ===========

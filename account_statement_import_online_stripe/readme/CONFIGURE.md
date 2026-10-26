@@ -21,3 +21,13 @@ Models*) for the Stripe journal, matching the lines of that partner with
 a negative amount, with the payable account of the partner as
 counterpart. The invoices of Stripe can then be reconciled with these
 payments.
+If Odoo itself takes payments through Stripe (the Stripe payment
+provider, for instance on the website), those payments are already
+recorded by Odoo. To avoid importing them twice, check *Payments
+Already Recorded by Odoo* (visible when the Payment module is
+installed). For each transaction paid through Odoo:
+
+- if its payment is posted on the account of this journal, the line of
+  the payment is not imported (its fee is);
+- otherwise the line is imported with the partner of the payment, ready
+  to be reconciled with it.
