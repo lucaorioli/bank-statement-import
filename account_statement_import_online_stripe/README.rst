@@ -14,6 +14,7 @@ Online Bank Statements: Stripe
    !! source digest: sha256:5c21eecab7c8e0158ccf17aeee6ed4da9bf33b1bef81bf20ccabe1424d1d85b6
    !! source digest: sha256:d17acfea545a968819ca883e65ac3d9863136bc7bad3e376b042628ed30e7282
    !! source digest: sha256:75f4d296bc4533aa3b2e0feff8b28c7756c73d81e5bc6f6e76af1c7afec780c0
+   !! source digest: sha256:0b2a7dc14353fe1c133800fb50bd532251505c5c06411260725aff8110dee0b7
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -87,6 +88,12 @@ each transaction paid through Odoo:
   the payment is not imported (its fee is);
 - otherwise the line is imported with the partner of the payment, ready
   to be reconciled with it.
+To check the statements against the balance of the Stripe account, check
+*Statement Balances*: the starting and ending balances of each statement
+are set from the current balance of the account (available and pending)
+less the net amounts of the later transactions, and Odoo shows the
+statements whose lines do not match them. The balance and the later
+transactions are read once for each pull.
 
 Bug Tracker
 ===========

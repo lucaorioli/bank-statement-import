@@ -5,3 +5,4 @@ from . import test_stripe_api_errors
 from . import test_stripe_billing
 from . import test_stripe_fees
 from . import test_stripe_odoo_payments
+from . import test_stripe_balances
