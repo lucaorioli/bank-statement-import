@@ -7,17 +7,14 @@ import logging
 import re
 import time
 import urllib.request
-from datetime import datetime
-from urllib.error import HTTPError, URLError
 from datetime import date, datetime
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 
 import pytz
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.exceptions import UserError
 from odoo.tools import html2plaintext
 
 _logger = logging.getLogger(__name__)
@@ -71,6 +68,34 @@ class OnlineBankStatementProviderStripe(models.Model):
         help="Partner set on the fee lines when they are recorded as payments "
         "to Stripe.",
     )
+    stripe_skip_website_payments = fields.Boolean(
+        string="Payments Already Recorded by Odoo",
+        help="Payments made through the Stripe payment provider of Odoo (for "
+        "instance on the website) are already recorded by Odoo. When their "
+        "payment is posted on the account of this journal, the line of the "
+        "payment is not imported again (its fee is); otherwise the line gets the "
+        "partner of the payment, ready to be reconciled. It needs the Payment "
+        "module.",
+    )
+    stripe_payment_installed = fields.Boolean(
+        compute="_compute_stripe_payment_installed"
+    )
+    stripe_statement_balances = fields.Boolean(
+        string="Statement Balances",
+        help="Set the starting and ending balances of the statements from the "
+        "balance of the Stripe account, so that Odoo shows the statements whose "
+        "lines do not match it. It needs more requests to Stripe.",
+    )
+    stripe_foreign_currency = fields.Boolean(
+        string="Payments in Foreign Currencies",
+        help="For the payments made in a currency other than the one of the "
+        "balance, keep on the line the amount and the currency of the payment.",
+    )
+
+    def _compute_stripe_payment_installed(self):
+        installed = "payment.transaction" in self.env
+        for provider in self:
+            provider.stripe_payment_installed = installed
 
     @api.constrains("service", "stripe_fee_as_payment", "stripe_fee_partner_id")
     def _check_stripe_fee_partner(self):
@@ -85,33 +110,6 @@ class OnlineBankStatementProviderStripe(models.Model):
                         "Set the partner of the fees to record them as payments."
                     )
                 )
-    stripe_skip_website_payments = fields.Boolean(
-        string="Payments Already Recorded by Odoo",
-        help="Payments made through the Stripe payment provider of Odoo (for "
-        "instance on the website) are already recorded by Odoo. When their "
-        "payment is posted on the account of this journal, the line of the "
-        "payment is not imported again (its fee is); otherwise the line gets the "
-        "partner of the payment, ready to be reconciled. It needs the Payment "
-        "module.",
-    )
-    stripe_payment_installed = fields.Boolean(
-        compute="_compute_stripe_payment_installed"
-    )
-
-    def _compute_stripe_payment_installed(self):
-        installed = "payment.transaction" in self.env
-        for provider in self:
-            provider.stripe_payment_installed = installed
-    stripe_statement_balances = fields.Boolean(
-        string="Statement Balances",
-        help="Set the starting and ending balances of the statements from the "
-        "balance of the Stripe account, so that Odoo shows the statements whose "
-        "lines do not match it. It needs more requests to Stripe.",
-    stripe_foreign_currency = fields.Boolean(
-        string="Payments in Foreign Currencies",
-        help="For the payments made in a currency other than the one of the "
-        "balance, keep on the line the amount and the currency of the payment.",
-    )
 
     @api.model
     def _get_available_services(self):
@@ -152,13 +150,12 @@ class OnlineBankStatementProviderStripe(models.Model):
         fee_values = self._stripe_fee_line_values()
         lines = []
         cache = {}
+        other_currencies = set()
         transactions = list(self._stripe_api_get_all("/balance_transactions", params))
         odoo_payments = {}
         if self.stripe_skip_website_payments:
             odoo_payments = self._stripe_get_odoo_payments(transactions)
         for tx in transactions:
-        other_currencies = set()
-        for tx in self._stripe_api_get_all("/balance_transactions", params):
             if tx["currency"].lower() != currency.name.lower():
                 other_currencies.add(tx["currency"].upper())
                 continue
@@ -172,18 +169,6 @@ class OnlineBankStatementProviderStripe(models.Model):
                     if key in odoo_payments
                 ),
                 None,
-            lines.append(
-                {
-                    "ref": safe_format(self.stripe_reference, tx),
-                    "payment_ref": safe_format(self.stripe_label, tx),
-                    "narration": safe_format(self.stripe_note, tx),
-                    "amount": float(tx["amount"]) / (10**currency.decimal_places),
-                    "date": datetime.fromtimestamp(tx["created"]),
-                    "unique_import_id": tx["id"],
-                    "raw_data": json.dumps(tx),
-                    **self._stripe_foreign_currency_values(tx),
-                    **self._stripe_line_details(tx),
-                }
             )
             if odoo_payment:
                 payment_values = self._stripe_odoo_payment_line_values(odoo_payment)
@@ -197,6 +182,8 @@ class OnlineBankStatementProviderStripe(models.Model):
                         "date": datetime.fromtimestamp(tx["created"]),
                         "unique_import_id": tx["id"],
                         "raw_data": json.dumps(tx),
+                        **self._stripe_line_details(tx),
+                        **self._stripe_foreign_currency_values(tx),
                         **payment_values,
                     }
                 )
@@ -213,6 +200,8 @@ class OnlineBankStatementProviderStripe(models.Model):
                         **fee_values,
                     }
                 )
+        if other_currencies:
+            self._stripe_warn_other_currencies(other_currencies)
         statement_values = {}
         if self.stripe_statement_balances:
             factor = 10**currency.decimal_places
@@ -593,13 +582,6 @@ class OnlineBankStatementProviderStripe(models.Model):
             path=path,
             message=message,
         )
-
-
-def _stripe_id(value):
-    """Id of a Stripe object, expanded or not"""
-    if isinstance(value, dict):
-        return value.get("id")
-    return value
 
 
 def _stripe_payment_keys(tx):
