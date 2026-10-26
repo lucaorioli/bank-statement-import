@@ -31,3 +31,9 @@ installed). For each transaction paid through Odoo:
   the payment is not imported (its fee is);
 - otherwise the line is imported with the partner of the payment, ready
   to be reconciled with it.
+To check the statements against the balance of the Stripe account, check
+*Statement Balances*: the starting and ending balances of each statement
+are set from the current balance of the account (available and pending)
+less the net amounts of the later transactions, and Odoo shows the
+statements whose lines do not match them. The balance and the later
+transactions are read once for each pull.

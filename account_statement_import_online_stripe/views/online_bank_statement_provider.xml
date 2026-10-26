@@ -30,6 +30,7 @@
                         name="stripe_skip_website_payments"
                         invisible="not stripe_payment_installed"
                     />
+                    <field name="stripe_statement_balances" />
                     <field name="stripe_label" string="Statement Label" />
                     <field name="stripe_note" string="Statement Note" />
                     <field name="stripe_reference" string="Statement Reference" />
