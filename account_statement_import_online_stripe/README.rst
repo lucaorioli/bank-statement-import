@@ -15,6 +15,7 @@ Online Bank Statements: Stripe
    !! source digest: sha256:e53d5e1d750d59f762ce80db664ce78bc90f9cdc6ca4cc8535c4c1987a6e07d8
    !! source digest: sha256:8291679fc2d98dda7d811ae0309a236f843c169aadbabd8fc63a09bfe83c45cb
    !! source digest: sha256:c1180e695a6758a9379e50180ae7c191c7b2905f60675330208086d7231a5e47
+   !! source digest: sha256:3b0cc6e1daeb56c97c77549148764a1261bbf7c59f00ea157f94827142801304
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -94,6 +95,17 @@ are set from the current balance of the account (available and pending)
 less the net amounts of the later transactions, and Odoo shows the
 statements whose lines do not match them. The balance and the later
 transactions are read once for each pull.
+Stripe keeps a balance for each currency of the account, and the
+transactions are in the currency of their balance. A provider imports
+the balance in the currency of its journal: to import the balance in
+another currency, add a provider with the same key on a journal in that
+currency. When a balance in another currency has transactions and no
+provider imports it, a message on the provider says so.
+
+A payment made in a currency other than the one of its balance (for
+instance a payment in USD settled in EUR) is imported in the currency of
+the balance. To also keep the amount and the currency of the payment on
+the line, check *Payments in Foreign Currencies*.
 
 Bug Tracker
 ===========
