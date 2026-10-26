@@ -12,6 +12,7 @@ Online Bank Statements: Stripe
    !! changes will be overwritten.                   !!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !! source digest: sha256:09fc52e1dd0e71a30c256bb26b5cbbbef525cbd3bc48bfa98575033b7a70711e
+   !! source digest: sha256:e53d5e1d750d59f762ce80db664ce78bc90f9cdc6ca4cc8535c4c1987a6e07d8
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
@@ -66,6 +67,15 @@ in the raw data of the lines. The source of the transactions must be
 expanded, as it is by default (``data.source``). Both the API versions
 before and after 2025-03-31.basil are supported, so the version of the
 Stripe account does not need to be changed.
+Stripe takes its fees from the balance, and sends invoices for them
+later. To record each fee as a payment of those invoices, check *Fees as
+Payments to Stripe* and choose the partner of Stripe: the fee lines get
+this partner and the transaction type ``fee``. Then create a
+reconciliation model (*Invoicing > Configuration > Reconciliation
+Models*) for the Stripe journal, matching the lines of that partner with
+a negative amount, with the payable account of the partner as
+counterpart. The invoices of Stripe can then be reconciled with these
+payments.
 
 Bug Tracker
 ===========
