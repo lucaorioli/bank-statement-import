@@ -4,6 +4,8 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+from odoo.exceptions import UserError
+
 from odoo.addons.base.tests.common import BaseCommon
 
 from ..models.online_bank_statement_provider_paypal import _paypal_payment_keys
@@ -65,6 +67,7 @@ class TestPayPalOdooPayments(BaseCommon):
     def _obtain_lines(self, odoo_payments=None, line_values=None):
         with (
             patch(f"{MODULE}._paypal_get_token", return_value="TOKEN"),
+            patch(f"{MODULE}._paypal_warn_other_currencies"),
             patch(f"{MODULE}._paypal_get_transactions", return_value=self.transactions),
             patch(
                 f"{MODULE}._paypal_get_transaction",
@@ -119,6 +122,29 @@ class TestPayPalOdooPayments(BaseCommon):
         get_odoo_payments.assert_not_called()
         self.assertEqual(len(lines), 6)
 
+    def test_order_captures(self):
+        order = {
+            "id": "ORDER3",
+            "purchase_units": [
+                {"payments": {"captures": [{"id": "CAPTURE3"}, {"id": "CAPTURE4"}]}},
+                {"reference_id": "without payments"},
+            ],
+        }
+        with patch(f"{MODULE}._paypal_retrieve", return_value=order) as retrieve:
+            captures = self.provider._paypal_get_order_captures("TOKEN", "ORDER3")
+        self.assertEqual(captures, ["CAPTURE3", "CAPTURE4"])
+        retrieve.assert_called_once_with(
+            "https://api.paypal.com/v2/checkout/orders/ORDER3", "TOKEN"
+        )
+        # Not an order (for instance a capture): nothing, without error
+        with patch(
+            f"{MODULE}._paypal_retrieve",
+            side_effect=UserError("RESOURCE_NOT_FOUND: not found"),
+        ):
+            self.assertEqual(
+                self.provider._paypal_get_order_captures("TOKEN", "CAPTURE1"), []
+            )
+
     def test_odoo_payments_search(self):
         """With the PayPal payment provider, find the done transactions"""
         if "payment.transaction" not in self.env:
@@ -138,14 +164,28 @@ class TestPayPalOdooPayments(BaseCommon):
             "currency_id": self.env.ref("base.USD").id,
             "partner_id": self.partner.id,
         }
-        done, __ = self.env["payment.transaction"].create(
+        done, __, by_webhook, earlier = self.env["payment.transaction"].create(
             [
                 dict(values, reference="T1", provider_reference="ORDER2", state="done"),
                 dict(values, reference="T2", provider_reference="CAPTURE3"),
+                # The webhook stored the order: its capture is read from PayPal
+                dict(values, reference="T3", provider_reference="ORDER3", state="done"),
+                dict(values, reference="T4", provider_reference="ORDER4", state="done"),
             ]
         )
-        odoo_payments = self.provider._paypal_get_odoo_payments(self.transactions)
-        self.assertEqual(odoo_payments, {"ORDER2": done})
+        by_webhook.last_state_change = DAY + timedelta(hours=11)
+        # Done long before the transactions: its order is not read
+        earlier.last_state_change = DAY - timedelta(days=5)
+        orders = {"ORDER3": ["CAPTURE3"], "ORDER4": ["CAPTURE1"]}
+        with patch(
+            f"{MODULE}._paypal_get_order_captures",
+            side_effect=lambda token, order_id: orders.get(order_id, []),
+        ) as get_order_captures:
+            odoo_payments = self.provider._paypal_get_odoo_payments(
+                "TOKEN", self.transactions
+            )
+        self.assertEqual(odoo_payments, {"ORDER2": done, "CAPTURE3": by_webhook})
+        get_order_captures.assert_called_once_with("TOKEN", "ORDER3")
         # Without a payment posted on the journal, the line gets the partner
         self.assertEqual(
             self.provider._paypal_odoo_payment_line_values(done),
