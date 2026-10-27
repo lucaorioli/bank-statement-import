@@ -83,6 +83,10 @@ class TestAccountBankAccountStatementImportOnlinePayPal(common.TransactionCase):
             _provider_class + "._paypal_get_token",
             return_value="--TOKEN--",
         )
+        # The requests of the balances in other currencies are tested apart
+        self.mock_warn_other_currencies = lambda: mock.patch(
+            _provider_class + "._paypal_warn_other_currencies",
+        )
 
     def test_good_token(self):
         journal = self.AccountJournal.create(
@@ -265,6 +269,7 @@ class TestAccountBankAccountStatementImportOnlinePayPal(common.TransactionCase):
                 side_effect=[mocked_response_1, mocked_response_2],
             ),
             self.mock_token(),
+            self.mock_warn_other_currencies(),
         ):
             data = provider.with_context(
                 test_account_statement_import_online_paypal_monday=True,
@@ -384,6 +389,7 @@ class TestAccountBankAccountStatementImportOnlinePayPal(common.TransactionCase):
                 side_effect=[mocked_response_1, mocked_response_2],
             ),
             self.mock_token(),
+            self.mock_warn_other_currencies(),
         ):
             data = provider._obtain_statement_data(
                 self.now - relativedelta(hours=1),
