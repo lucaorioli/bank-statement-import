@@ -35,6 +35,18 @@ PAYPAL_RETRY_DELAY = 1
 PAYPAL_MAX_RETRY_DELAY = 30
 # Payments of Odoo done this long before or after the transactions may be theirs
 PAYPAL_ODOO_PAYMENT_MARGIN = relativedelta(days=1)
+# Conversion of a payment received in another currency
+CONVERSION_EVENT_CODE = "T0200"
+# Details of the payment given to its conversion
+CONVERTED_PAYMENT_FIELDS = (
+    "paypal_account_id",
+    "transaction_subject",
+    "transaction_note",
+    "invoice_id",
+    "custom_field",
+    "instrument_type",
+    "instrument_sub_type",
+)
 # pylint: disable=prefer-env-translation
 EVENT_DESCRIPTIONS = {
     "T0000": _lt("General PayPal-to-PayPal payment"),
@@ -272,6 +284,7 @@ class OnlineBankStatementProviderPayPal(models.Model):
                 key=lambda transaction: self._paypal_get_transaction_date(transaction),
             )
         )
+        self._paypal_add_converted_payments(token, transactions, date_since, date_until)
         odoo_payments = {}
         if self.paypal_skip_website_payments:
             odoo_payments = self._paypal_get_odoo_payments(token, transactions)
@@ -424,6 +437,7 @@ class OnlineBankStatementProviderPayPal(models.Model):
         )
         if payer_full_name:
             line.update({"partner_name": payer_full_name})
+        line.update(self._paypal_converted_payment_line_values(data))
         lines = [line]
         if fee_amount:
             lines += [
@@ -536,6 +550,59 @@ class OnlineBankStatementProviderPayPal(models.Model):
         ):
             return None
         return {"partner_id": payment_transaction.partner_id.id}
+
+    def _paypal_add_converted_payments(self, token, transactions, since, until):
+        """Give to the conversions the payments in other currencies they convert.
+
+        When the account converts a payment received in another currency, the
+        payment is not in the currency of the journal: only its conversion is
+        imported, without the payer. The payment is read among the transactions
+        of all currencies, and its details are given to the conversion, which
+        keeps it under ``converted_transaction``.
+        """
+        self.ensure_one()
+        conversions = [
+            transaction
+            for transaction in transactions
+            if _paypal_converted_payment_id(transaction)
+        ]
+        if not conversions:
+            return
+        payments = {
+            transaction["transaction_info"]["transaction_id"]: transaction
+            for transaction in self._paypal_get_transactions(token, None, since, until)
+            if not _paypal_converted_payment_id(transaction)
+        }
+        for conversion in conversions:
+            payment = payments.get(_paypal_converted_payment_id(conversion))
+            if not payment:
+                continue
+            info = conversion["transaction_info"]
+            payment_info = payment["transaction_info"]
+            for field in CONVERTED_PAYMENT_FIELDS:
+                if payment_info.get(field):
+                    info[field] = payment_info[field]
+            if payment.get("payer_info"):
+                conversion["payer_info"] = payment["payer_info"]
+            conversion["converted_transaction"] = payment
+
+    @api.model
+    def _paypal_converted_payment_line_values(self, data):
+        """Amount in its own currency of the payment converted by a transaction."""
+        payment = data.get("converted_transaction")
+        if not payment:
+            return {}
+        amount = payment["transaction_info"].get("transaction_amount") or {}
+        currency = self.env["res.currency"].search(
+            [("name", "=", amount.get("currency_code"))], limit=1
+        )
+        if not currency:
+            return {}
+        # The fee is taken in the currency of the payment, before the conversion
+        converted = self._paypal_get_transaction_total_amount(
+            payment
+        ) + self._paypal_get_transaction_fee_amount(payment)
+        return {"foreign_currency_id": currency.id, "amount_currency": str(converted)}
 
     def _paypal_get_token(self):
         self.ensure_one()
@@ -678,7 +745,6 @@ class OnlineBankStatementProviderPayPal(models.Model):
             total_pages = None
             while total_pages is None or page <= total_pages:
                 params = {
-                    "transaction_currency": currency,
                     "start_date": self._paypal_format_datetime(interval_start),
                     "end_date": self._paypal_format_datetime(interval_end),
                     "fields": "all",
@@ -686,6 +752,9 @@ class OnlineBankStatementProviderPayPal(models.Model):
                     "page_size": 500,
                     "page": page,
                 }
+                # Without currency, the transactions of all currencies
+                if currency:
+                    params["transaction_currency"] = currency
                 url = f"{base}/v1/reporting/transactions?{urlencode(params)}"
 
                 # NOTE: Workaround for INVALID_REQUEST (see ROADMAP.rst)
@@ -878,10 +947,22 @@ def _paypal_payment_keys(transaction):
     """PayPal ids under which Odoo may have recorded the payment of a transaction.
 
     The id of the capture, and the id of its order when PayPal gives it as the
-    reference of the transaction (type ODR).
+    reference of the transaction (type ODR). For the conversion of a payment in
+    another currency, the id of that payment.
     """
     info = transaction.get("transaction_info") or {}
-    keys = {info.get("transaction_id")}
+    keys = {info.get("transaction_id"), _paypal_converted_payment_id(transaction)}
     if info.get("paypal_reference_id_type") == "ODR":
         keys.add(info.get("paypal_reference_id"))
     return {key for key in keys if isinstance(key, str)}
+
+
+def _paypal_converted_payment_id(transaction):
+    """Id of the payment converted by a transaction, if it is a conversion."""
+    info = transaction.get("transaction_info") or {}
+    if (
+        info.get("transaction_event_code") == CONVERSION_EVENT_CODE
+        and info.get("paypal_reference_id_type") == "TXN"
+    ):
+        return info.get("paypal_reference_id")
+    return None
