@@ -24,6 +24,8 @@ _provider_class = (
 
 class FakeHTTPError(HTTPError):
     def __init__(self, content):
+        # A client error, which is not retried
+        super().__init__("https://url", 400, "Bad Request", None, None)
         self.content = content
 
     # pylint: disable=method-required-super
