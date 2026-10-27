@@ -2,3 +2,4 @@
 
 from . import test_account_statement_import_online_paypal
 from . import test_paypal_odoo_payments
+from . import test_paypal_currencies
