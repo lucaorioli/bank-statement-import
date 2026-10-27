@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 from odoo.addons.base.tests.common import BaseCommon
 
+from ..models.online_bank_statement_provider_stripe import _stripe_payment_keys
+
 MODULE = (
     "odoo.addons.account_statement_import_online_stripe.models"
     ".online_bank_statement_provider_stripe.OnlineBankStatementProviderStripe"
@@ -70,6 +72,14 @@ class TestStripeOdooPayments(BaseCommon):
                 datetime(2023, 3, 15), datetime(2023, 3, 16)
             )
         return {line["unique_import_id"]: line for line in lines}
+
+    def test_payment_keys(self):
+        self.assertEqual(_stripe_payment_keys(self.transactions[0]), {"ch_1", "pi_1"})
+        # A refund refers to the payment intent of the payment it refunds: not a
+        # key of the refund
+        refund = _transaction("txn_4", "re_1", "pi_1")
+        refund["source"]["object"] = "refund"
+        self.assertEqual(_stripe_payment_keys(refund), {"re_1"})
 
     def test_payments_recorded_by_odoo(self):
         lines = self._obtain_lines(

@@ -157,6 +157,30 @@ class TestStripeCurrencies(BaseCommon):
         self._obtain_lines()
         self.assertEqual(self.provider.message_ids, messages)
 
+    def test_other_balance_currency_of_the_company(self):
+        """A journal without currency imports the currency of the company"""
+        journal = self.env["account.journal"].create(
+            {
+                "name": "Stripe company currency",
+                "type": "bank",
+                "code": "STRC",
+                "bank_statements_source": "online",
+            }
+        )
+        self.env["online.bank.statement.provider"].create(
+            {
+                "service": "stripe",
+                "password": "test_api_key",
+                "journal_id": journal.id,
+            }
+        )
+        messages = self.provider.message_ids
+        with mute_logger(MODEL):
+            self.provider._stripe_warn_other_currencies(
+                {journal.company_id.currency_id.name}
+            )
+        self.assertEqual(self.provider.message_ids, messages)
+
     def test_foreign_currency_statement_line(self):
         with patch(f"{MODULE}._stripe_api_get_all", return_value=TRANSACTIONS[:1]):
             self.provider._pull(datetime(2023, 3, 15), datetime(2023, 3, 16))
