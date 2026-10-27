@@ -64,6 +64,7 @@ In the first case the lines of the statement no longer add up to the
 balances given by PayPal, as the payments are recorded outside of the
 statement. Posting the payments on an outstanding account, and then
 reconciling the lines, keeps the statements complete.
+
 PayPal keeps a balance for each currency of the account. A provider
 imports the transactions in the currency of its journal: to import the
 balance in another currency, add a provider with the same *Client ID*
