@@ -3,15 +3,17 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest import mock
+from unittest.mock import patch
 from urllib.error import HTTPError
 
 from dateutil.relativedelta import relativedelta
 
 from odoo import fields
 from odoo.exceptions import UserError
+from odoo.tools import mute_logger
 
 from odoo.addons.base.tests.common import BaseCommon
 
@@ -50,6 +52,17 @@ class UrlopenRetValMock:
         return self.content.encode("utf-8")
 
 
+CURRENCY_MODULE = (
+    "odoo.addons.account_statement_import_online_paypal.models"
+    ".online_bank_statement_provider_paypal.OnlineBankStatementProviderPayPal"
+)
+
+
+CURRENCY_DAY = datetime.combine(datetime.now().date(), datetime.min.time()) - timedelta(
+    days=1
+)
+
+
 class TestAccountBankAccountStatementImportOnlinePayPal(BaseCommon):
     @classmethod
     def setUpClass(cls):
@@ -83,6 +96,30 @@ class TestAccountBankAccountStatementImportOnlinePayPal(BaseCommon):
         cls.mock_token = lambda self: mock.patch(
             _provider_class + "._paypal_get_token",
             return_value="--TOKEN--",
+        )
+        # The requests of the balances in other currencies are tested apart
+        cls.mock_warn_other_currencies = lambda self: mock.patch(
+            _provider_class + "._paypal_warn_other_currencies",
+        )
+        cls.currency_eur = cls.env.ref("base.EUR")
+        cls.currency_usd = cls.env.ref("base.USD")
+        cls.currency_usd.active = True
+        cls.currency_journal = cls.env["account.journal"].create(
+            {
+                "name": "PayPal EUR",
+                "type": "bank",
+                "code": "PCUR",
+                "bank_statements_source": "online",
+                "currency_id": cls.currency_eur.id,
+            }
+        )
+        cls.currency_provider = cls.env["online.bank.statement.provider"].create(
+            {
+                "service": "paypal",
+                "username": "client_id",
+                "password": "secret",
+                "journal_id": cls.currency_journal.id,
+            }
         )
 
     def test_good_token(self):
@@ -266,6 +303,7 @@ class TestAccountBankAccountStatementImportOnlinePayPal(BaseCommon):
                 side_effect=[mocked_response_1, mocked_response_2],
             ),
             self.mock_token(),
+            self.mock_warn_other_currencies(),
         ):
             data = provider.with_context(
                 test_account_statement_import_online_paypal_monday=True,
@@ -385,6 +423,7 @@ class TestAccountBankAccountStatementImportOnlinePayPal(BaseCommon):
                 side_effect=[mocked_response_1, mocked_response_2],
             ),
             self.mock_token(),
+            self.mock_warn_other_currencies(),
         ):
             data = provider._obtain_statement_data(
                 self.now - relativedelta(hours=1),
@@ -899,4 +938,113 @@ class TestAccountBankAccountStatementImportOnlinePayPal(BaseCommon):
         self.assertEqual(
             provider._paypal_format_datetime(dt),
             "2026-01-15T11:28:27Z",
+        )
+
+    def _currency_warn(self, before, after):
+        with patch(
+            f"{CURRENCY_MODULE}._paypal_get_balances", side_effect=[before, after]
+        ):
+            self.currency_provider._paypal_warn_other_currencies(
+                "TOKEN", "EUR", CURRENCY_DAY, CURRENCY_DAY + timedelta(days=1)
+            )
+
+    def _currency_messages(self):
+        return self.currency_provider.message_ids.filtered(
+            lambda message: "were not imported" in (message.body or "")
+        )
+
+    def test_get_balances(self):
+        response = {
+            "balances": [
+                {
+                    "currency": "EUR",
+                    "primary": True,
+                    "available_balance": {"currency_code": "EUR", "value": "10.50"},
+                },
+                {
+                    "currency": "USD",
+                    "available_balance": {"currency_code": "USD", "value": "3.00"},
+                },
+                {"currency": "GBP"},
+            ]
+        }
+        with patch(
+            f"{CURRENCY_MODULE}._paypal_retrieve", return_value=response
+        ) as retrieve:
+            balances = self.currency_provider._paypal_get_balances(
+                "TOKEN", CURRENCY_DAY
+            )
+        self.assertEqual(balances, {"EUR": Decimal("10.50"), "USD": Decimal("3.00")})
+        self.assertIn("/v1/reporting/balances?as_of_time=", retrieve.call_args[0][0])
+
+    @mute_logger(
+        "odoo.addons.account_statement_import_online_paypal.models."
+        "online_bank_statement_provider_paypal"
+    )
+    def test_other_currency_changed(self):
+        self._currency_warn(
+            {"EUR": Decimal(10), "USD": Decimal(0)},
+            {"EUR": Decimal(20), "USD": Decimal(5)},
+        )
+        self.assertEqual(len(self._currency_messages()), 1)
+        self.assertIn("USD", self._currency_messages().body)
+        # Once, not at each pull
+        self._currency_warn({"USD": Decimal(5)}, {"USD": Decimal(8)})
+        self.assertEqual(len(self._currency_messages()), 1)
+
+    def test_other_currency_unchanged(self):
+        self._currency_warn(
+            {"EUR": Decimal(10), "USD": Decimal(5)}, {"USD": Decimal(5)}
+        )
+        self.assertFalse(self._currency_messages())
+
+    def test_other_currency_imported(self):
+        """No warning when another provider imports that currency"""
+        journal = self.env["account.journal"].create(
+            {
+                "name": "PayPal USD",
+                "type": "bank",
+                "code": "PPUSD",
+                "bank_statements_source": "online",
+                "currency_id": self.currency_usd.id,
+            }
+        )
+        self.env["online.bank.statement.provider"].create(
+            {
+                "service": "paypal",
+                "username": "client_id",
+                "password": "secret",
+                "journal_id": journal.id,
+            }
+        )
+        self._currency_warn({"USD": Decimal(0)}, {"USD": Decimal(5)})
+        self.assertFalse(self._currency_messages())
+
+    @mute_logger(
+        "odoo.addons.account_statement_import_online_paypal.models."
+        "online_bank_statement_provider_paypal"
+    )
+    def test_balances_not_available(self):
+        """An error on the balances does not stop the pull"""
+        with patch(
+            f"{CURRENCY_MODULE}._paypal_get_balances",
+            side_effect=UserError("No balances"),
+        ):
+            self.currency_provider._paypal_warn_other_currencies(
+                "TOKEN", "EUR", CURRENCY_DAY, CURRENCY_DAY + timedelta(days=1)
+            )
+        self.assertFalse(self._currency_messages())
+
+    def test_pull_warns(self):
+        with (
+            patch(f"{CURRENCY_MODULE}._paypal_get_token", return_value="TOKEN"),
+            patch(f"{CURRENCY_MODULE}._paypal_get_transactions", return_value=[]),
+            patch(f"{CURRENCY_MODULE}._paypal_get_balance", return_value=Decimal(0)),
+            patch(f"{CURRENCY_MODULE}._paypal_warn_other_currencies") as warn,
+        ):
+            self.currency_provider._obtain_statement_data(
+                CURRENCY_DAY, CURRENCY_DAY + timedelta(days=1)
+            )
+        warn.assert_called_once_with(
+            "TOKEN", "EUR", CURRENCY_DAY, CURRENCY_DAY + timedelta(days=1)
         )
