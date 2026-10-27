@@ -9,3 +9,8 @@ transaction belongs to one.
 Requests that fail for a temporary reason (rate limit, server or network
 error) are retried a few times, waiting longer at each attempt. Other
 errors are reported with the message sent by PayPal and its debug id.
+
+When PayPal converts a payment received in another currency into the
+currency of the journal, only the conversion is in the currency of the
+journal. Its line gets the details of the payment (payer, subject,
+invoice) and its amount in the other currency, net of the PayPal fee.
