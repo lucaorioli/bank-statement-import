@@ -421,7 +421,11 @@ class OnlineBankStatementProviderStripe(models.Model):
                 ("password", "=", self.password),
                 ("id", "!=", self.id),
             ]
-        ).mapped(lambda provider: provider.currency_id.name)
+        ).mapped(
+            lambda provider: (
+                provider.currency_id or provider.company_id.currency_id
+            ).name
+        )
         missing = sorted(currencies - set(handled))
         if not missing:
             return
@@ -585,7 +589,11 @@ def _stripe_payment_keys(tx):
     source = tx.get("source")
     if not isinstance(source, dict):
         return set()
-    keys = {source.get("id"), source.get("payment_intent")}
+    keys = {source.get("id")}
+    # Odoo records a payment under its payment intent; a refund also refers to
+    # the payment intent of the payment it refunds, which is not its own
+    if source.get("object") == "charge":
+        keys.add(source.get("payment_intent"))
     return {key for key in keys if isinstance(key, str)}
 
 
