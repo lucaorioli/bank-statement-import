@@ -11,7 +11,7 @@ from base64 import b64encode
 from datetime import datetime
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import dateutil.parser
 import pytz
@@ -33,6 +33,8 @@ TRANSACTIONS_SCOPE = "https://uri.paypal.com/services/reporting/search/read"
 PAYPAL_MAX_RETRIES = 3
 PAYPAL_RETRY_DELAY = 1
 PAYPAL_MAX_RETRY_DELAY = 30
+# Payments of Odoo done this long before or after the transactions may be theirs
+PAYPAL_ODOO_PAYMENT_MARGIN = relativedelta(days=1)
 EVENT_DESCRIPTIONS = {
     "T0000": _lt("General PayPal-to-PayPal payment"),
     "T0001": _lt("MassPay payment"),
@@ -270,7 +272,7 @@ class OnlineBankStatementProviderPayPal(models.Model):
         )
         odoo_payments = {}
         if self.paypal_skip_website_payments:
-            odoo_payments = self._paypal_get_odoo_payments(transactions)
+            odoo_payments = self._paypal_get_odoo_payments(token, transactions)
         lines = []
         for transaction in transactions:
             transaction_lines = self._paypal_transaction_to_lines(transaction)
@@ -434,11 +436,16 @@ class OnlineBankStatementProviderPayPal(models.Model):
             ]
         return lines
 
-    def _paypal_get_odoo_payments(self, transactions):
+    def _paypal_get_odoo_payments(self, token, transactions):
         """Payments recorded by the PayPal payment provider of Odoo.
 
-        :return: a dict mapping the PayPal ids of the payments (capture or
-            order) to their ``payment.transaction``
+        Odoo stores the id of the capture when the customer comes back from
+        PayPal, but the webhook replaces it with the id of the order, which the
+        transactions do not mention: the captures of the other payments done
+        around the transactions are read from their order.
+
+        :return: a dict mapping the PayPal ids of the payments to their
+            ``payment.transaction``
         """
         self.ensure_one()
         if "payment.transaction" not in self.env:
@@ -448,18 +455,63 @@ class OnlineBankStatementProviderPayPal(models.Model):
             keys.update(_paypal_payment_keys(transaction))
         if not keys:
             return {}
+        dates = [
+            self._paypal_get_transaction_date(transaction)
+            for transaction in transactions
+        ]
         payment_transactions = (
             self.env["payment.transaction"]
             .sudo()
             .search(
                 [
                     ("provider_code", "=", "paypal"),
-                    ("provider_reference", "in", list(keys)),
                     ("state", "=", "done"),
+                    "|",
+                    ("provider_reference", "in", list(keys)),
+                    "&",
+                    (
+                        "last_state_change",
+                        ">=",
+                        min(dates) - PAYPAL_ODOO_PAYMENT_MARGIN,
+                    ),
+                    (
+                        "last_state_change",
+                        "<=",
+                        max(dates) + PAYPAL_ODOO_PAYMENT_MARGIN,
+                    ),
                 ]
             )
         )
-        return {ptx.provider_reference: ptx for ptx in payment_transactions}
+        odoo_payments = {}
+        for payment_transaction in payment_transactions:
+            reference = payment_transaction.provider_reference
+            if reference in keys:
+                odoo_payments[reference] = payment_transaction
+                continue
+            for capture_id in self._paypal_get_order_captures(token, reference):
+                if capture_id in keys:
+                    odoo_payments[capture_id] = payment_transaction
+        return odoo_payments
+
+    def _paypal_get_order_captures(self, token, order_id):
+        """Ids of the captures of an order, none when it is not an order."""
+        self.ensure_one()
+        if not order_id:
+            return []
+        url = "{}/v2/checkout/orders/{}".format(
+            self.api_base or PAYPAL_API_BASE, quote(order_id, safe="")
+        )
+        try:
+            data = self._paypal_retrieve(url, token)
+        except (HTTPError, UserError) as error:
+            _logger.info("PayPal order %s not read: %s", order_id, error)
+            return []
+        return [
+            capture["id"]
+            for unit in data.get("purchase_units") or []
+            for capture in (unit.get("payments") or {}).get("captures") or []
+            if capture.get("id")
+        ]
 
     def _paypal_odoo_payment_line_values(self, payment_transaction):
         """Values of the line of a payment already recorded by Odoo.
@@ -823,9 +875,8 @@ class OnlineBankStatementProviderPayPal(models.Model):
 def _paypal_payment_keys(transaction):
     """PayPal ids under which Odoo may have recorded the payment of a transaction.
 
-    Odoo stores the id of the capture when the customer comes back from PayPal,
-    and the id of the order when the webhook arrives: the order is the
-    reference of the capture (type ODR).
+    The id of the capture, and the id of its order when PayPal gives it as the
+    reference of the transaction (type ODR).
     """
     info = transaction.get("transaction_info") or {}
     keys = {info.get("transaction_id")}

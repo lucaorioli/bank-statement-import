@@ -60,6 +60,13 @@ installed). For each transaction paid through Odoo:
 - otherwise the line is imported with the partner of the payment, ready
   to be reconciled with it.
 
+Odoo identifies a payment by its capture, until the webhook of the
+PayPal payment provider replaces it with the order, which the
+transactions do not mention. For those payments the captures are read
+from the order, so the app of the provider needs access to the orders
+of the account as well (the feature to accept payments), and not only
+*Transaction Search*.
+
 In the first case the lines of the statement no longer add up to the
 balances given by PayPal, as the payments are recorded outside of the
 statement. Posting the payments on an outstanding account, and then
