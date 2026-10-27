@@ -1,8 +1,8 @@
 # Copyright 2019-2020 Brainbean Apps (https://brainbeanapps.com)
 # Copyright 2021 CorporateHub (https://corporatehub.eu)
+# Copyright 2026 Luca Orioli <lucaorioli@gmail.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-import itertools
 import json
 import urllib.request
 from base64 import b64encode
@@ -15,7 +15,7 @@ import dateutil.parser
 import pytz
 from dateutil.relativedelta import relativedelta
 
-from odoo import api, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import LazyTranslate
 
@@ -183,6 +183,24 @@ NO_DATA_FOR_DATE_AVAIL_MSG = "Data for the given start date is not available."
 class OnlineBankStatementProviderPayPal(models.Model):
     _inherit = "online.bank.statement.provider"
 
+    paypal_skip_website_payments = fields.Boolean(
+        string="Payments Already Recorded by Odoo",
+        help="Payments made through the PayPal payment provider of Odoo (for "
+        "instance on the website) are already recorded by Odoo. When their "
+        "payment is posted on the account of this journal, the line of the "
+        "payment is not imported again (its fee is); otherwise the line gets the "
+        "partner of the payment, ready to be reconciled. It needs the Payment "
+        "module.",
+    )
+    paypal_payment_installed = fields.Boolean(
+        compute="_compute_paypal_payment_installed"
+    )
+
+    def _compute_paypal_payment_installed(self):
+        installed = "payment.transaction" in self.env
+        for provider in self:
+            provider.paypal_payment_installed = installed
+
     @api.model
     def _get_available_services(self):
         return super()._get_available_services() + [
@@ -241,11 +259,28 @@ class OnlineBankStatementProviderPayPal(models.Model):
                 key=lambda transaction: self._paypal_get_transaction_date(transaction),
             )
         )
-        lines = list(
-            itertools.chain.from_iterable(
-                map(lambda x: self._paypal_transaction_to_lines(x), transactions)
+        odoo_payments = {}
+        if self.paypal_skip_website_payments:
+            odoo_payments = self._paypal_get_odoo_payments(transactions)
+        lines = []
+        for transaction in transactions:
+            transaction_lines = self._paypal_transaction_to_lines(transaction)
+            odoo_payment = next(
+                (
+                    odoo_payments[key]
+                    for key in _paypal_payment_keys(transaction)
+                    if key in odoo_payments
+                ),
+                None,
             )
-        )
+            if odoo_payment:
+                payment_values = self._paypal_odoo_payment_line_values(odoo_payment)
+                if payment_values is None:
+                    # Already posted on the journal: only the fee is imported
+                    transaction_lines = transaction_lines[1:]
+                else:
+                    transaction_lines[0].update(payment_values)
+            lines += transaction_lines
 
         first_transaction = transactions[0]
         first_transaction_id = first_transaction["transaction_info"]["transaction_id"]
@@ -350,6 +385,55 @@ class OnlineBankStatementProviderPayPal(models.Model):
                 }
             ]
         return lines
+
+    def _paypal_get_odoo_payments(self, transactions):
+        """Payments recorded by the PayPal payment provider of Odoo.
+
+        :return: a dict mapping the PayPal ids of the payments (capture or
+            order) to their ``payment.transaction``
+        """
+        self.ensure_one()
+        if "payment.transaction" not in self.env:
+            return {}
+        keys = set()
+        for transaction in transactions:
+            keys.update(_paypal_payment_keys(transaction))
+        if not keys:
+            return {}
+        payment_transactions = (
+            self.env["payment.transaction"]
+            .sudo()
+            .search(
+                [
+                    ("provider_code", "=", "paypal"),
+                    ("provider_reference", "in", list(keys)),
+                    ("state", "=", "done"),
+                ]
+            )
+        )
+        return {ptx.provider_reference: ptx for ptx in payment_transactions}
+
+    def _paypal_odoo_payment_line_values(self, payment_transaction):
+        """Values of the line of a payment already recorded by Odoo.
+
+        :return: None when the payment is already posted on the account of the
+            journal, so that the line must not be imported again; otherwise the
+            values to add to the line
+        """
+        self.ensure_one()
+        payment = (
+            payment_transaction.payment_id
+            if "payment_id" in payment_transaction._fields
+            else None
+        )
+        if (
+            payment
+            and payment.move_id.state == "posted"
+            and payment.outstanding_account_id
+            and payment.outstanding_account_id == self.journal_id.default_account_id
+        ):
+            return None
+        return {"partner_id": payment_transaction.partner_id.id}
 
     def _paypal_get_token(self):
         self.ensure_one()
@@ -571,3 +655,17 @@ class OnlineBankStatementProviderPayPal(models.Model):
         else:
             raise UserError(self.env._("Unknown authentication specified!"))
         return urllib.request.urlopen(request)
+
+
+def _paypal_payment_keys(transaction):
+    """PayPal ids under which Odoo may have recorded the payment of a transaction.
+
+    Odoo stores the id of the capture when the customer comes back from PayPal,
+    and the id of the order when the webhook arrives: the order is the
+    reference of the capture (type ODR).
+    """
+    info = transaction.get("transaction_info") or {}
+    keys = {info.get("transaction_id")}
+    if info.get("paypal_reference_id_type") == "ODR":
+        keys.add(info.get("paypal_reference_id"))
+    return {key for key in keys if isinstance(key, str)}
