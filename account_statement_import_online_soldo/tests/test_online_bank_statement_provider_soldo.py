@@ -528,8 +528,20 @@ class TestOnlineBankStatementProviderSoldo(BaseCommon):
             soldo_transaction("T4", status="Authorised", has_attachments=True),
             soldo_transaction("T5"),
         ]
+        # Other modules may write on the lines during the pull, and recompute
+        # the reconciliation: keep the line reconciled as it would really be
+        StatementLine = type(self.env["account.bank.statement.line"])
+        compute_is_reconciled = StatementLine._compute_is_reconciled
+
+        def keep_reconciled(lines):
+            compute_is_reconciled(lines)
+            lines.filtered(lambda line: line.id == reconciled.id).is_reconciled = True
+
         mock, calls = self._mock_update_api([], updated_transactions)
-        with mock:
+        with (
+            mock,
+            patch.object(StatementLine, "_compute_is_reconciled", keep_reconciled),
+        ):
             self.provider._pull(datetime(2026, 3, 20), datetime(2026, 3, 21))
         searches = [
             call[2]["params"] for call in calls if call[1] != "/oauth/authorize"
