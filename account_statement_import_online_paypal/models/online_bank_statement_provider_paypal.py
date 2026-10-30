@@ -8,7 +8,7 @@ import logging
 import time
 import urllib.request
 from base64 import b64encode
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -660,8 +660,9 @@ class OnlineBankStatementProviderPayPal(models.Model):
         """
         self.ensure_one()
         try:
+            utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
             before = self._paypal_get_balances(token, date_since)
-            after = self._paypal_get_balances(token, min(date_until, datetime.utcnow()))
+            after = self._paypal_get_balances(token, min(date_until, utc_now))
         except UserError as error:
             # Only a warning: it must not stop the pull
             _logger.warning(

@@ -6,6 +6,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from odoo.exceptions import UserError
+from odoo.tools import mute_logger
 
 from odoo.addons.base.tests.common import BaseCommon
 
@@ -73,6 +74,10 @@ class TestPayPalCurrencies(BaseCommon):
         self.assertEqual(balances, {"EUR": Decimal("10.50"), "USD": Decimal("3.00")})
         self.assertIn("/v1/reporting/balances?as_of_time=", retrieve.call_args[0][0])
 
+    @mute_logger(
+        "odoo.addons.account_statement_import_online_paypal.models."
+        "online_bank_statement_provider_paypal"
+    )
     def test_other_currency_changed(self):
         self._warn(
             {"EUR": Decimal(10), "USD": Decimal(0)},
@@ -110,6 +115,10 @@ class TestPayPalCurrencies(BaseCommon):
         self._warn({"USD": Decimal(0)}, {"USD": Decimal(5)})
         self.assertFalse(self._messages())
 
+    @mute_logger(
+        "odoo.addons.account_statement_import_online_paypal.models."
+        "online_bank_statement_provider_paypal"
+    )
     def test_balances_not_available(self):
         """An error on the balances does not stop the pull"""
         with patch(
