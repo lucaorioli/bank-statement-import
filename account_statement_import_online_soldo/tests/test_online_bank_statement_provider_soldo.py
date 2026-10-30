@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from odoo.exceptions import UserError
+from odoo.tools import mute_logger
 
 from odoo.addons.base.tests.common import BaseCommon
 
@@ -473,6 +474,7 @@ class TestOnlineBankStatementProviderSoldo(BaseCommon):
             [("res_model", "=", "account.move"), ("res_id", "=", line.move_id.id)]
         )
 
+    @mute_logger(MODULE)
     def test_attachments(self):
         self.provider.soldo_attachments = True
         transactions = [
@@ -728,6 +730,10 @@ class TestOnlineBankStatementProviderSoldo(BaseCommon):
         ]
         self.assertEqual(len(update_searches), 1)
 
+    @mute_logger(
+        "odoo.addons.account_statement_import_online.models."
+        "online_bank_statement_provider"
+    )
     def test_update_lines_error(self):
         self.provider.soldo_update_lines = True
 
