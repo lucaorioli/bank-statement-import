@@ -10,9 +10,3 @@ at the provider configuration level.
 
 **NOTE**: To access these features, user needs to belong to *Show Full
 Accounting Features* group.
-
-When a database is neutralized (for instance a copy used for testing),
-all the providers are deactivated, so that the copy does not pull
-statements with the credentials of the original database. To use a
-provider in the copy, set test credentials if needed and activate it
-again.
